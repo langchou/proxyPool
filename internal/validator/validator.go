@@ -1,14 +1,16 @@
 package validator
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"time"
+
 	"github.com/langchou/proxyPool/internal/logger"
 	"github.com/langchou/proxyPool/internal/model"
-	"time"
 
 	"go.uber.org/zap"
 	"golang.org/x/net/proxy"
@@ -102,11 +104,17 @@ func (v *Validator) createHTTPClient(p *model.Proxy) (*http.Client, error) {
 		return nil, err
 	}
 
-	return &http.Client{
-		Transport: &http.Transport{
-			Proxy: http.ProxyURL(parsedURL),
+	// 创建跳过证书验证的 Transport
+	transport := &http.Transport{
+		Proxy: http.ProxyURL(parsedURL),
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true, // 跳过证书验证
 		},
-		Timeout: v.timeout,
+	}
+
+	return &http.Client{
+		Transport: transport,
+		Timeout:   v.timeout,
 	}, nil
 }
 
@@ -116,10 +124,16 @@ func (v *Validator) createSocksClient(p *model.Proxy) (*http.Client, error) {
 		return nil, err
 	}
 
-	return &http.Client{
-		Transport: &http.Transport{
-			Dial: dialer.Dial,
+	// 创建跳过证书验证的 Transport
+	transport := &http.Transport{
+		Dial: dialer.Dial,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true, // 跳过证书验证
 		},
-		Timeout: v.timeout,
+	}
+
+	return &http.Client{
+		Transport: transport,
+		Timeout:   v.timeout,
 	}, nil
 }
