@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/langchou/proxyPool/internal/api"
+	"github.com/langchou/proxyPool/internal/checker"
 	"github.com/langchou/proxyPool/internal/config"
 	"github.com/langchou/proxyPool/internal/crawler"
 	"github.com/langchou/proxyPool/internal/logger"
@@ -59,6 +60,10 @@ func main() {
 	crawler := crawler.NewManager(store, validator)
 	logger.Log.Info("Crawler manager initialized")
 
+	// 初始化检查器
+	checker := checker.NewChecker(store, validator)
+	logger.Log.Info("Proxy checker initialized")
+
 	// 启动后台爬虫任务
 	go func() {
 		// 首次执行延迟1秒，让API服务器先启动
@@ -82,6 +87,22 @@ func main() {
 			logger.Log.Info("Starting scheduled proxy crawling...")
 			if err := crawler.Run(ctx); err != nil {
 				logger.Log.Error("Scheduled crawling failed", zap.Error(err))
+			}
+		}
+	}()
+
+	// 启动定时检查任务
+	go func() {
+		// 等待一段时间后开始第一次检查
+		time.Sleep(time.Minute)
+
+		ticker := time.NewTicker(config.GlobalConfig.GetCheckInterval())
+		defer ticker.Stop()
+
+		for range ticker.C {
+			logger.Log.Info("Starting scheduled proxy check...")
+			if err := checker.Run(context.Background()); err != nil {
+				logger.Log.Error("Scheduled proxy check failed", zap.Error(err))
 			}
 		}
 	}()
