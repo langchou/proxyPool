@@ -20,31 +20,30 @@
 
 1. 克隆项目
 ```bash
-git clone https://github.com/your-repo/proxy-pool.git
+git clone https://github.com/langchou/proxyPool.git
+cd proxyPool
 ```
 
 2. 编译运行
 ```bash
 make build
-
 make run
 ```
 
-
-### API使用
+### API 使用
 
 1. 获取单个代理
-``` bash
-curl http://localhost:8080/proxy
+```bash
+curl "http://localhost:8080/proxy"
 ```
 
 2. 获取指定类型代理
-``` bash
+```bash
 curl "http://localhost:8080/proxy?type=http,https&count=5"
 ```
 
 3. 获取高匿代理
-``` bash
+```bash
 curl "http://localhost:8080/proxy?anonymous=true"
 ```
 
@@ -72,6 +71,48 @@ curl "http://localhost:8080/proxy?anonymous=true"
 - 代理验证参数
 - 爬虫更新间隔
 - 日志配置
+
+## 添加代理源
+
+1. 在 `internal/crawler/sources` 目录下创建新的源文件，例如 `myproxy.go`：
+
+```go
+package sources
+
+type MyProxySource struct {
+    BaseSource
+}
+
+func NewMyProxySource() *MyProxySource {
+    return &MyProxySource{
+        BaseSource: BaseSource{name: "myproxy"},
+    }
+}
+
+func (s *MyProxySource) Fetch() ([]*model.Proxy, error) {
+    // 实现代理获取逻辑
+    proxies := make([]*model.Proxy, 0)
+    
+    // ... 获取代理的具体实现 ...
+    
+    return proxies, nil
+}
+```
+
+2. 在 `internal/crawler/crawler.go` 中注册新代理源：
+
+```go
+func NewManager(storage storage.Storage, validator *validator.Validator) *Manager {
+    return &Manager{
+        sources: []sources.Source{
+            sources.NewOpenProxyListSource(),
+            sources.NewMyProxySource(),  // 添加新代理源
+        },
+        storage:   storage,
+        validator: validator,
+    }
+}
+```
 
 ## License
 
