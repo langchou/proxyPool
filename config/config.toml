@@ -1,0 +1,30 @@
+# 服务配置
+[server]
+port = 8080
+mode = "debug"  # debug/release
+
+# Redis配置
+[redis]
+host = "localhost"
+port = 6379
+password = ""
+db = 0
+
+# 代理验证配置
+[validator]
+timeout = 10  # 增加超时时间到10秒
+check_interval = 10  # 定时检查间隔（分钟）
+test_url = "http://httpbin.org/ip"
+
+# 爬虫配置
+[crawler]
+interval = 30  # 爬取间隔（分钟）
+batch_size = 20  # 每批验证的代理数量
+fetch_delay = 2  # 每个页面爬取间隔（秒）
+max_retry = 3    # 最大重试次数
+
+# 日志配置
+[log]
+level = "debug"  # debug/info/warn/error
+output = "file"  # console/file
+file_path = "logs/proxy_pool.log"

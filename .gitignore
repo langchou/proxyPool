@@ -1,0 +1,10 @@
+/build/
+.idea/
+.vscode/
+*.log
+.DS_Store
+*.swp
+*.swo
+/vendor/
+*.test
+*.out
