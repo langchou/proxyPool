@@ -9,6 +9,12 @@
 - 定时验证可用性
 - RESTful API 接口
 - 代理质量评分
+- 安全特性
+  - 基本认证 (Basic Auth)
+  - API Key 认证
+  - IP 访问频率限制
+  - 自动封禁异常 IP
+  - 所有安全特性可配置
 
 ## 快速开始
 
@@ -45,6 +51,53 @@ curl "http://localhost:8080/proxy?type=http,https&count=5"
 3. 获取高匿代理
 ```bash
 curl "http://localhost:8080/proxy?anonymous=true"
+```
+
+### 认证方式
+
+1. 基本认证 (Basic Auth)
+```bash
+# 使用用户名密码访问
+curl -u admin:123456 "http://localhost:8080/proxy"
+
+# 使用 base64 编码方式
+curl -H "Authorization: Basic YWRtaW46MTIzNDU2" "http://localhost:8080/proxy"
+```
+
+2. API Key 认证
+```bash
+# 在请求头中携带 API Key
+curl -H "X-API-Key: your-api-key" "http://localhost:8080/proxy"
+```
+
+### 访问限制
+- 每个 IP 在指定时间窗口内有请求次数限制
+- 超过限制后 IP 会被临时封禁
+- 可以通过响应头查看限制情况：
+  - X-RateLimit-Remaining: 剩余请求次数
+  - X-RateLimit-Limit: 总请求限制
+  - X-RateLimit-Reset: 重置时间
+
+### 配置安全特性
+
+在 `data/config.toml` 中配置：
+
+```toml
+[security]
+# 基本认证
+auth_enabled = false     # 是否启用认证
+username = "admin"       # 认证用户名
+password = "123456"      # 认证密码
+
+# API Key认证
+api_key_enabled = true   # 是否启用 API Key
+api_keys = ["key1", "key2", "key3"]  # 允许的 API Key 列表
+
+# 限流配置
+rate_limit_enabled = true  # 是否启用限流
+rate_limit = 100          # 每个时间窗口最大请求数
+rate_window = 1           # 时间窗口（分钟）
+ban_duration = 24         # 封禁时长（小时）
 ```
 
 ### 响应格式

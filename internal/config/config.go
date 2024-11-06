@@ -13,6 +13,7 @@ type Config struct {
 	Validator ValidatorConfig `mapstructure:"validator"`
 	Crawler   CrawlerConfig   `mapstructure:"crawler"`
 	Log       LogConfig       `mapstructure:"log"`
+	Security  SecurityConfig  `mapstructure:"security"`
 }
 
 type ServerConfig struct {
@@ -42,6 +43,24 @@ type LogConfig struct {
 	Level    string `mapstructure:"level"`
 	Output   string `mapstructure:"output"`
 	FilePath string `mapstructure:"file_path"`
+}
+
+// SecurityConfig 安全配置
+type SecurityConfig struct {
+	// 基本认证
+	AuthEnabled bool   `mapstructure:"auth_enabled"`
+	Username    string `mapstructure:"username"`
+	Password    string `mapstructure:"password"`
+
+	// API Key认证
+	APIKeyEnabled bool     `mapstructure:"api_key_enabled"`
+	APIKeys       []string `mapstructure:"api_keys"`
+
+	// 限流配置
+	RateLimit        int  `mapstructure:"rate_limit"`         // 每个时间窗口最大请求数
+	RateWindow       int  `mapstructure:"rate_window"`        // 时间窗口（分钟）
+	BanDuration      int  `mapstructure:"ban_duration"`       // 封禁时长（小时）
+	RateLimitEnabled bool `mapstructure:"rate_limit_enabled"` // 是否启用限流
 }
 
 var (

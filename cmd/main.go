@@ -4,6 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"time"
+
 	"github.com/langchou/proxyPool/internal/api"
 	"github.com/langchou/proxyPool/internal/config"
 	"github.com/langchou/proxyPool/internal/crawler"
@@ -11,7 +13,6 @@ import (
 	"github.com/langchou/proxyPool/internal/middleware"
 	"github.com/langchou/proxyPool/internal/storage"
 	"github.com/langchou/proxyPool/internal/validator"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -89,6 +90,20 @@ func main() {
 	r := gin.New()
 	r.Use(middleware.Logger())
 	r.Use(middleware.ErrorHandler())
+
+	// 初始化限流器（如果启用）
+	if config.GlobalConfig.Security.RateLimitEnabled {
+		rateLimiter := middleware.NewRateLimiter(
+			store.GetRedisClient(),
+			config.GlobalConfig.Security.RateLimit,
+			time.Duration(config.GlobalConfig.Security.RateWindow)*time.Minute,
+			time.Duration(config.GlobalConfig.Security.BanDuration)*time.Hour,
+		)
+		r.Use(rateLimiter.RateLimit())
+	}
+
+	r.Use(middleware.BasicAuth())  // 基本认证
+	r.Use(middleware.APIKeyAuth()) // API Key 认证
 	r.Use(gin.Recovery())
 
 	handler := api.NewHandler(store)

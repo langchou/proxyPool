@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"math/rand"
+	"time"
+
 	"github.com/langchou/proxyPool/internal/logger"
 	"github.com/langchou/proxyPool/internal/model"
-	"time"
 
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
@@ -136,4 +137,9 @@ func (s *RedisStorage) UpdateScore(ctx context.Context, key string, score int) e
 
 	// 重新保存
 	return s.Save(ctx, &proxy)
+}
+
+// 在 RedisStorage 结构体中添加获取客户端的方法
+func (s *RedisStorage) GetRedisClient() *redis.Client {
+	return s.client
 }
