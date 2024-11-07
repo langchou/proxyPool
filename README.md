@@ -19,21 +19,43 @@
 ## 快速开始
 
 ### 环境要求
-- Go 1.21+
-- Redis 6.0+
+- Redis 6.0+ (必需)
 
-### 安装运行
+### 部署步骤
 
-1. 克隆项目
-```bash
-git clone https://github.com/langchou/proxyPool.git
-cd proxyPool
-```
+1. 首先需要运行 Redis 服务（以下方式二选一）：
 
-2. 编译运行
-```bash
-make build
-make run
+   a. 使用 Docker 运行 Redis（推荐）：
+   ```bash
+   docker pull redis:latest
+   docker run -d --name redis -p 6379:6379 redis:latest
+   ```
+
+   b. 直接安装 Redis：
+   - Linux: `apt install redis-server` 或 `yum install redis`
+   - macOS: `brew install redis`
+   - Windows: 从 Redis 官网下载安装包
+
+2. 运行 ProxyPool：
+   ```bash
+   # 解压下载的发布包
+   unzip proxypool-{对应平台}.zip
+   cd proxypool-{对应平台}
+   
+   # 运行服务
+   ./proxypool-{对应平台}
+   ```
+
+### Redis 配置
+
+在 `data/config.toml` 中配置 Redis 连接信息：
+
+```toml
+[redis]
+host = "localhost"    # Redis 服务器地址
+port = 6379          # Redis 端口
+password = ""        # Redis 密码（如果有）
+db = 0              # 使用的数据库编号
 ```
 
 ### API 使用
@@ -117,13 +139,14 @@ ban_duration = 24         # 封禁时长（小时）
 }
 ```
 
-## 配置说明
+### 配置说明
 
 配置文件位于 `data/config.toml`，主要配置项：
-- Redis 连接信息
+- Redis 连接信息（必需配置）
 - 代理验证参数
 - 爬虫更新间隔
 - 日志配置
+- 安全特性配置
 
 ## 添加代理源
 
@@ -166,6 +189,17 @@ func NewManager(storage storage.Storage, validator *validator.Validator) *Manage
     }
 }
 ```
+
+## 常见问题
+
+1. Redis 连接失败
+   - 检查 Redis 服务是否正常运行
+   - 确认配置文件中的 Redis 连接信息是否正确
+   - 确保 Redis 端口（默认6379）未被占用
+
+2. 配置文件找不到
+   - 确保 `data` 目录与程序在同一目录下
+   - 确保 `data/config.toml` 文件存在且格式正确
 
 ## License
 

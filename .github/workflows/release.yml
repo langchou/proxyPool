@@ -2,9 +2,12 @@ name: Release ProxyPool
 
 on:
   push:
-    branches:
-      - 'test'
+    tags:
+      - 'v*'
 
+permissions:
+  contents: write
+  
 jobs:
   build:
     name: Build and Release
@@ -28,27 +31,49 @@ jobs:
       - name: Build binaries
         run: |
           mkdir -p build/release
-          # Linux amd64
-          GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=${{ env.VERSION }}" -o build/release/proxypool-linux-amd64 cmd/main.go
+          # Linux amd64 - 添加静态链接标志
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=${{ env.VERSION }} -w -s" -o build/release/proxypool-linux-amd64 cmd/main.go
           # Linux arm64
-          GOOS=linux GOARCH=arm64 go build -ldflags "-X main.Version=${{ env.VERSION }}" -o build/release/proxypool-linux-arm64 cmd/main.go
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "-X main.Version=${{ env.VERSION }} -w -s" -o build/release/proxypool-linux-arm64 cmd/main.go
           # Windows amd64
-          GOOS=windows GOARCH=amd64 go build -ldflags "-X main.Version=${{ env.VERSION }}" -o build/release/proxypool-windows-amd64.exe cmd/main.go
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "-X main.Version=${{ env.VERSION }} -w -s" -o build/release/proxypool-windows-amd64.exe cmd/main.go
           # macOS amd64
-          GOOS=darwin GOARCH=amd64 go build -ldflags "-X main.Version=${{ env.VERSION }}" -o build/release/proxypool-darwin-amd64 cmd/main.go
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags "-X main.Version=${{ env.VERSION }} -w -s" -o build/release/proxypool-darwin-amd64 cmd/main.go
           # macOS arm64
-          GOOS=darwin GOARCH=arm64 go build -ldflags "-X main.Version=${{ env.VERSION }}" -o build/release/proxypool-darwin-arm64 cmd/main.go
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "-X main.Version=${{ env.VERSION }} -w -s" -o build/release/proxypool-darwin-arm64 cmd/main.go
           
-          # 复制配置文件到发布目录
-          cp config/config.toml build/release/
-          
-          # 创建各平台的压缩包
+          # 为每个平台创建正确的目录结构和配置文件
           cd build/release
-          zip -r proxypool-linux-amd64.zip proxypool-linux-amd64 config.toml
-          zip -r proxypool-linux-arm64.zip proxypool-linux-arm64 config.toml
-          zip -r proxypool-windows-amd64.zip proxypool-windows-amd64.exe config.toml
-          zip -r proxypool-darwin-amd64.zip proxypool-darwin-amd64 config.toml
-          zip -r proxypool-darwin-arm64.zip proxypool-darwin-arm64 config.toml
+          
+          # Linux AMD64
+          mkdir -p linux-amd64/data
+          cp ../../config/config.toml linux-amd64/data/
+          mv proxypool-linux-amd64 linux-amd64/
+          zip -r proxypool-linux-amd64.zip linux-amd64/
+          
+          # Linux ARM64
+          mkdir -p linux-arm64/data
+          cp ../../config/config.toml linux-arm64/data/
+          mv proxypool-linux-arm64 linux-arm64/
+          zip -r proxypool-linux-arm64.zip linux-arm64/
+          
+          # Windows AMD64
+          mkdir -p windows-amd64/data
+          cp ../../config/config.toml windows-amd64/data/
+          mv proxypool-windows-amd64.exe windows-amd64/
+          zip -r proxypool-windows-amd64.zip windows-amd64/
+          
+          # macOS AMD64
+          mkdir -p darwin-amd64/data
+          cp ../../config/config.toml darwin-amd64/data/
+          mv proxypool-darwin-amd64 darwin-amd64/
+          zip -r proxypool-darwin-amd64.zip darwin-amd64/
+          
+          # macOS ARM64
+          mkdir -p darwin-arm64/data
+          cp ../../config/config.toml darwin-arm64/data/
+          mv proxypool-darwin-arm64 darwin-arm64/
+          zip -r proxypool-darwin-arm64.zip darwin-arm64/
 
       - name: Create Release
         id: create_release
@@ -56,10 +81,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: Test Release
-          draft: true
-          prerelease: true
-          tag_name: test-v0.0.1
+          name: ProxyPool ${{ github.ref_name }}
+          draft: false
+          prerelease: false
           files: |
             build/release/proxypool-linux-amd64.zip
             build/release/proxypool-linux-arm64.zip
@@ -67,11 +91,47 @@ jobs:
             build/release/proxypool-darwin-amd64.zip
             build/release/proxypool-darwin-arm64.zip
           body: |
-            ## 🚧 测试版本 - 请勿使用
-            
-            这是一个用于测试 GitHub Actions 的版本。
+            ## ProxyPool ${{ github.ref_name }} 发布说明
             
             ### 支持平台
             - Linux (amd64, arm64)
             - Windows (amd64)
             - macOS (amd64, arm64)
+            
+            ### 环境依赖
+            - Redis 服务（必需）
+            
+            ### Redis 服务部署建议
+            
+            1. 使用 Docker 运行 Redis（推荐）：
+            ```bash
+            docker pull redis:latest
+            docker run -d --name redis -p 6379:6379 redis:latest
+            ```
+            
+            2. 或直接安装 Redis：
+            - Linux: `apt install redis-server` 或 `yum install redis`
+            - macOS: `brew install redis`
+            - Windows: 从 Redis 官网下载安装包
+            
+            ### 使用说明
+            1. 确保 Redis 服务已启动
+            2. 下载对应平台的压缩包
+            3. 解压后进入目录
+            4. 配置文件位于 `data/config.toml`，按需修改 Redis 连接信息
+            5. 运行可执行文件启动服务
+            
+            ### 配置说明
+            在 `data/config.toml` 中配置 Redis：
+            ```toml
+            [redis]
+            host = "localhost"    # Redis 服务器地址
+            port = 6379          # Redis 端口
+            password = ""        # Redis 密码（如果有）
+            db = 0              # 使用的数据库编号
+            ```
+            
+            ### 注意事项
+            - 首次使用请先修改配置文件
+            - 确保 data 目录与程序在同一目录下
+            - 确保 Redis 服务正常运行且可访问
