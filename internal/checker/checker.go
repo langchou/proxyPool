@@ -2,7 +2,7 @@ package checker
 
 import (
 	"context"
-	"time"
+	"fmt"
 
 	"github.com/langchou/proxyPool/internal/logger"
 	"github.com/langchou/proxyPool/internal/storage"
@@ -22,14 +22,13 @@ func NewChecker(storage storage.Storage, validator *validator.Validator) *Checke
 	}
 }
 
-// Run 运行代理检查
 func (c *Checker) Run(ctx context.Context) error {
-	logger.Log.Info("Starting proxy check")
+	logger.Log.Info("Starting to check existing proxies")
 
+	// 从存储中获取所有代理
 	proxies, err := c.storage.GetAll(ctx)
 	if err != nil {
-		logger.Log.Error("Failed to get proxies for checking", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to get proxies from storage: %w", err)
 	}
 
 	logger.Log.Info("Retrieved proxies for checking", zap.Int("count", len(proxies)))
@@ -39,34 +38,41 @@ func (c *Checker) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
+			logger.Log.Debug("Checking proxy",
+				zap.String("ip", proxy.IP),
+				zap.String("port", proxy.Port))
+
+			// 验证代理
 			valid, speed := c.validator.Validate(proxy)
-			if !valid {
-				// 移除无效代理
-				logger.Log.Debug("Removing invalid proxy",
+			if valid {
+				proxy.Speed = speed
+				// 验证成功，更新代理信息
+				if err := c.storage.Save(ctx, proxy); err != nil {
+					logger.Log.Error("Failed to update proxy",
+						zap.String("ip", proxy.IP),
+						zap.String("port", proxy.Port),
+						zap.Error(err))
+				}
+				logger.Log.Info("Proxy check passed",
+					zap.String("ip", proxy.IP),
+					zap.String("port", proxy.Port),
+					zap.Int64("speed", speed))
+			} else {
+				// 验证失败，从存储中删除
+				key := proxy.IP + ":" + proxy.Port
+				if err := c.storage.Remove(ctx, key); err != nil {
+					logger.Log.Error("Failed to remove invalid proxy",
+						zap.String("ip", proxy.IP),
+						zap.String("port", proxy.Port),
+						zap.Error(err))
+				}
+				logger.Log.Info("Removed invalid proxy",
 					zap.String("ip", proxy.IP),
 					zap.String("port", proxy.Port))
-				c.storage.Remove(ctx, proxy.IP+":"+proxy.Port)
-			} else {
-				// 更新代理信息
-				proxy.Speed = speed
-				proxy.LastCheck = time.Now()
-				// 根据响应时间调整分数
-				if speed < 1000 { // 小于1秒
-					proxy.Score += 1
-				} else {
-					proxy.Score -= 1
-				}
-				if proxy.Score < 0 {
-					proxy.Score = 0
-				}
-				if proxy.Score > 100 {
-					proxy.Score = 100
-				}
-				c.storage.Save(ctx, proxy)
 			}
 		}
 	}
 
-	logger.Log.Info("Completed proxy check")
+	logger.Log.Info("Finished checking all proxies")
 	return nil
 }

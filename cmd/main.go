@@ -66,12 +66,10 @@ func main() {
 
 	// 启动后台爬虫任务
 	go func() {
-		// 首次执行延迟1秒，让API服务器先启动
-		time.Sleep(time.Second)
+		logger.Log.Info("Starting crawler goroutine")
 
 		// 创建一个用于取消的context
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := context.Background()
 
 		// 首次执行爬虫任务
 		logger.Log.Info("Running initial proxy crawling...")
@@ -79,30 +77,52 @@ func main() {
 			logger.Log.Error("Initial crawling failed", zap.Error(err))
 		}
 
-		// 定时执行爬虫任务
-		ticker := time.NewTicker(config.GlobalConfig.GetCrawlerInterval())
+		// 创建定时器
+		interval := config.GlobalConfig.GetCrawlerInterval()
+		logger.Log.Info("Setting up crawler timer", zap.Duration("interval", interval))
+		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
-		for range ticker.C {
-			logger.Log.Info("Starting scheduled proxy crawling...")
-			if err := crawler.Run(ctx); err != nil {
-				logger.Log.Error("Scheduled crawling failed", zap.Error(err))
+		for {
+			select {
+			case <-ticker.C:
+				logger.Log.Info("Starting scheduled proxy crawling...")
+				if err := crawler.Run(ctx); err != nil {
+					logger.Log.Error("Scheduled crawling failed", zap.Error(err))
+				}
 			}
 		}
 	}()
 
 	// 启动定时检查任务
 	go func() {
-		// 等待一段时间后开始第一次检查
-		time.Sleep(time.Minute)
+		logger.Log.Info("Starting checker goroutine")
 
-		ticker := time.NewTicker(config.GlobalConfig.GetCheckInterval())
+		ctx := context.Background()
+
+		// 等待30秒后开始第一次检查，给爬虫一些时间先获取代理
+		logger.Log.Info("Waiting 30 seconds before first check...")
+		time.Sleep(30 * time.Second)
+
+		// 执行第一次检查
+		logger.Log.Info("Running initial proxy check...")
+		if err := checker.Run(ctx); err != nil {
+			logger.Log.Error("Initial proxy check failed", zap.Error(err))
+		}
+
+		// 创建定时器
+		interval := config.GlobalConfig.GetCheckInterval()
+		logger.Log.Info("Setting up checker timer", zap.Duration("interval", interval))
+		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
-		for range ticker.C {
-			logger.Log.Info("Starting scheduled proxy check...")
-			if err := checker.Run(context.Background()); err != nil {
-				logger.Log.Error("Scheduled proxy check failed", zap.Error(err))
+		for {
+			select {
+			case <-ticker.C:
+				logger.Log.Info("Starting scheduled proxy check...")
+				if err := checker.Run(ctx); err != nil {
+					logger.Log.Error("Scheduled proxy check failed", zap.Error(err))
+				}
 			}
 		}
 	}()
