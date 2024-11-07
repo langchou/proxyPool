@@ -32,16 +32,16 @@ file_path = "logs/proxy_pool.log"
 # 安全配置
 [security]
 # 基本认证
-auth_enabled = true  # 是否启用认证
+auth_enabled = false  # 是否启用认证
 username = "admin"   # 基本认证用户名
 password = "123456"  # 基本认证密码
 
 # API Key认证
-api_key_enabled = true              # 是否启用 API Key
+api_key_enabled = false              # 是否启用 API Key
 api_keys = ["key1", "key2", "key3"] # 允许的 API Key 列表
 
 # 限流配置
-rate_limit_enabled = true    # 是否启用限流
+rate_limit_enabled = false    # 是否启用限流
 rate_limit = 100            # 每个时间窗口最大请求数
 rate_window = 1             # 时间窗口（分钟）
 ban_duration = 24           # 封禁时长（小时）
