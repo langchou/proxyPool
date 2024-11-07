@@ -1,0 +1,77 @@
+name: Release ProxyPool
+
+on:
+  push:
+    branches:
+      - 'test'
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21' # 设置你使用的 Go 版本
+
+      - name: Get version
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+      - name: Build binaries
+        run: |
+          mkdir -p build/release
+          # Linux amd64
+          GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=${{ env.VERSION }}" -o build/release/proxypool-linux-amd64 cmd/main.go
+          # Linux arm64
+          GOOS=linux GOARCH=arm64 go build -ldflags "-X main.Version=${{ env.VERSION }}" -o build/release/proxypool-linux-arm64 cmd/main.go
+          # Windows amd64
+          GOOS=windows GOARCH=amd64 go build -ldflags "-X main.Version=${{ env.VERSION }}" -o build/release/proxypool-windows-amd64.exe cmd/main.go
+          # macOS amd64
+          GOOS=darwin GOARCH=amd64 go build -ldflags "-X main.Version=${{ env.VERSION }}" -o build/release/proxypool-darwin-amd64 cmd/main.go
+          # macOS arm64
+          GOOS=darwin GOARCH=arm64 go build -ldflags "-X main.Version=${{ env.VERSION }}" -o build/release/proxypool-darwin-arm64 cmd/main.go
+          
+          # 复制配置文件到发布目录
+          cp config/config.toml build/release/
+          
+          # 创建各平台的压缩包
+          cd build/release
+          zip -r proxypool-linux-amd64.zip proxypool-linux-amd64 config.toml
+          zip -r proxypool-linux-arm64.zip proxypool-linux-arm64 config.toml
+          zip -r proxypool-windows-amd64.zip proxypool-windows-amd64.exe config.toml
+          zip -r proxypool-darwin-amd64.zip proxypool-darwin-amd64 config.toml
+          zip -r proxypool-darwin-arm64.zip proxypool-darwin-arm64 config.toml
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          name: Test Release
+          draft: true
+          prerelease: true
+          tag_name: test-v0.0.1
+          files: |
+            build/release/proxypool-linux-amd64.zip
+            build/release/proxypool-linux-arm64.zip
+            build/release/proxypool-windows-amd64.zip
+            build/release/proxypool-darwin-amd64.zip
+            build/release/proxypool-darwin-arm64.zip
+          body: |
+            ## 🚧 测试版本 - 请勿使用
+            
+            这是一个用于测试 GitHub Actions 的版本。
+            
+            ### 支持平台
+            - Linux (amd64, arm64)
+            - Windows (amd64)
+            - macOS (amd64, arm64)
