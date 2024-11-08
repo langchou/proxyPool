@@ -181,7 +181,6 @@ jobs:
   docker-test:
     name: Build and Push Test Docker Image
     runs-on: ubuntu-latest
-    # 只在推送到test分支时运行
     if: github.ref == 'refs/heads/test'
     
     steps:
@@ -201,6 +200,22 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+          
+      - name: Verify Docker Hub Login
+        run: |
+          echo "Checking Docker Hub login status..."
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+          echo "Checking if repository exists..."
+          docker search ${{ secrets.DOCKERHUB_USERNAME }}/proxypool
+          
+      - name: Debug Info
+        run: |
+          echo "Current ref: ${{ github.ref }}"
+          echo "Docker username: ${{ secrets.DOCKERHUB_USERNAME }}"
+          echo "Token length: ${#DOCKER_TOKEN}"
+          echo "Repository: ${{ secrets.DOCKERHUB_USERNAME }}/proxypool"
+        env:
+          DOCKER_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
       
       - name: Build and push
         uses: docker/build-push-action@v4
@@ -208,6 +223,6 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: docker.io/langchou/proxypool:test
+          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/proxypool:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
