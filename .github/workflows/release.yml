@@ -1,7 +1,9 @@
-name: Release ProxyPool
+name: Release and Docker Build
 
 on:
   push:
+    branches:
+      - test
     tags:
       - 'v*'
 
@@ -9,9 +11,11 @@ permissions:
   contents: write
   
 jobs:
-  build:
-    name: Build and Release
+  release:
+    name: Create Release
     runs-on: ubuntu-latest
+    # 只在推送tag时运行release job
+    if: startsWith(github.ref, 'refs/tags/')
     
     steps:
       - name: Checkout code
@@ -22,7 +26,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.21' # 设置你使用的 Go 版本
+          go-version: '1.21'
 
       - name: Get version
         id: get_version
@@ -31,7 +35,7 @@ jobs:
       - name: Build binaries
         run: |
           mkdir -p build/release
-          # Linux amd64 - 添加静态链接标志
+          # Linux amd64
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=${{ env.VERSION }} -w -s" -o build/release/proxypool-linux-amd64 cmd/main.go
           # Linux arm64
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "-X main.Version=${{ env.VERSION }} -w -s" -o build/release/proxypool-linux-arm64 cmd/main.go
@@ -42,7 +46,6 @@ jobs:
           # macOS arm64
           CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "-X main.Version=${{ env.VERSION }} -w -s" -o build/release/proxypool-darwin-arm64 cmd/main.go
           
-          # 为每个平台创建正确的目录结构和配置文件
           cd build/release
           
           # Linux AMD64
@@ -76,10 +79,7 @@ jobs:
           zip -r proxypool-darwin-arm64.zip darwin-arm64/
 
       - name: Create Release
-        id: create_release
         uses: softprops/action-gh-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           name: ProxyPool ${{ github.ref_name }}
           draft: false
@@ -120,18 +120,94 @@ jobs:
             3. 解压后进入目录
             4. 配置文件位于 `data/config.toml`，按需修改 Redis 连接信息
             5. 运行可执行文件启动服务
+
+  docker:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: release
+    # 在release job完成后运行，但只在推送tag时运行
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          
+      - name: Check Docker Login
+        run: |
+          echo "Testing Docker login..."
+          docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin <<< ${{ secrets.DOCKERHUB_TOKEN }}
+          echo "Docker login successful"
+          
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: docker.io/langchou/proxypool
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'test') }}
             
-            ### 配置说明
-            在 `data/config.toml` 中配置 Redis：
-            ```toml
-            [redis]
-            host = "localhost"    # Redis 服务器地址
-            port = 6379          # Redis 端口
-            password = ""        # Redis 密码（如果有）
-            db = 0              # 使用的数据库编号
-            ```
-            
-            ### 注意事项
-            - 首次使用请先修改配置文件
-            - 确保 data 目录与程序在同一目录下
-            - 确保 Redis 服务正常运行且可访问
+      - name: Show Docker Tags
+        run: |
+          echo "Will push the following tags:"
+          echo "${{ steps.meta.outputs.tags }}"
+      
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  docker-test:
+    name: Build and Push Test Docker Image
+    runs-on: ubuntu-latest
+    # 只在推送到test分支时运行
+    if: github.ref == 'refs/heads/test'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: docker.io/langchou/proxypool:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
