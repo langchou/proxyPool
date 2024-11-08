@@ -201,6 +201,93 @@ func NewManager(storage storage.Storage, validator *validator.Validator) *Manage
    - 确保 `data` 目录与程序在同一目录下
    - 确保 `data/config.toml` 文件存在且格式正确
 
+## Docker 部署
+
+### 1. 准备配置文件
+首先创建本地配置目录和配置文件：
+
+```bash
+# 创建配置目录
+mkdir -p /path/to/data
+
+# 创建配置文件
+cat > /path/to/data/config.toml << EOF
+[server]
+port = 8080
+mode = "release"
+
+[redis]
+host = "redis"    # 如果使用docker-compose，这里填redis服务名
+port = 6379
+password = ""
+db = 0
+
+# ... 其他配置 ...
+EOF
+```
+
+### 2. 运行容器
+
+```bash
+docker run -d \
+  --name proxypool \
+  -p 8080:8080 \
+  -v /path/to/data:/app/data \
+  --network your-network \  # 如果需要连接到Redis容器
+  langchou/proxypool:latest
+```
+
+### 3. Docker Compose 部署（推荐）
+
+创建 `docker-compose.yml`：
+
+```yaml
+version: '3'
+
+services:
+  redis:
+    image: redis:latest
+    restart: always
+    volumes:
+      - redis_data:/data
+    networks:
+      - proxypool_net
+
+  proxypool:
+    image: langchou/proxypool:latest
+    restart: always
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - redis
+    networks:
+      - proxypool_net
+
+volumes:
+  redis_data:
+
+networks:
+  proxypool_net:
+```
+
+运行服务：
+
+```bash
+docker-compose up -d
+```
+
+### 4. 查看日志
+
+```bash
+# 查看容器日志
+docker logs -f proxypool
+
+# 查看数据目录下的日志文件
+ls -l /path/to/data/logs/
+```
+
 ## License
 
 MIT License
