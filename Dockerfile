@@ -25,7 +25,7 @@ WORKDIR /app
 # 从构建阶段复制二进制文件
 COPY --from=builder /app/build/proxypool /app/proxypool
 
-# 创建data目录
+# 创建必要的目录
 RUN mkdir -p /app/data
 
 # 设置时区
